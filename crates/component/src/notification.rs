@@ -542,6 +542,8 @@ pub struct NotificationSettings {
     ///
     /// A single notification can override this with [`Notification::delivery`].
     pub delivery: NotificationDelivery,
+    /// Duration in seconds before auto-hiding, default: 1.0
+    pub duration: f64,
 }
 
 impl Default for NotificationSettings {
@@ -558,6 +560,7 @@ impl Default for NotificationSettings {
             max_items: 10,
             width: DEFAULT_NOTIFICATION_WIDTH,
             delivery: NotificationDelivery::default(),
+            duration: 1.0,
         }
     }
 }
@@ -838,7 +841,9 @@ impl NotificationList {
             id,
             notification,
             ToastOptions {
-                timeout: autohide.then_some(Duration::from_secs(5)),
+                timeout: autohide.then_some(Duration::from_secs_f64(
+                    cx.theme().notification.duration.clamp(0.1, 60.0),
+                )),
             },
             cx.background_executor().now(),
         );

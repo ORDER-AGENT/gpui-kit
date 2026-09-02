@@ -14,9 +14,21 @@ use gpui::{
     StyleRefinement, Styled, WeakFocusHandle, Window, actions, div, prelude::FluentBuilder as _,
 };
 use gpui_base::{TextSelection, TextSelectionLayer, TextSelectionScopeId};
-use std::{any::TypeId, rc::Rc};
+use std::{
+    any::TypeId,
+    rc::Rc,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 actions!(root, [Tab, TabPrev]);
+
+static INPUT_ACTIVE: AtomicBool = AtomicBool::new(false);
+pub fn input_active() -> bool {
+    INPUT_ACTIVE.load(Ordering::Relaxed)
+}
+pub(crate) fn set_input_active(v: bool) {
+    INPUT_ACTIVE.store(v, Ordering::Relaxed);
+}
 
 const CONTEXT: &str = "Root";
 pub(crate) fn init(cx: &mut App) {
@@ -321,6 +333,7 @@ impl Root {
 
     fn close_dialog_internal(&mut self) -> Option<FocusHandle> {
         self.focused_input = None;
+        set_input_active(false);
         self.active_dialogs
             .pop()
             .and_then(|d| d.previous_focused_handle)
@@ -361,6 +374,7 @@ impl Root {
 
     pub fn close_all_dialogs(&mut self, window: &mut Window, cx: &mut Context<'_, Root>) {
         self.focused_input = None;
+        set_input_active(false);
         let previous_focused_handle = self
             .active_dialogs
             .first()
@@ -406,6 +420,7 @@ impl Root {
 
     pub fn close_sheet(&mut self, window: &mut Window, cx: &mut Context<'_, Root>) {
         self.focused_input = None;
+        set_input_active(false);
         if let Some(previous_handle) = self
             .active_sheet
             .as_ref()

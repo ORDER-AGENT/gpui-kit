@@ -8,7 +8,7 @@ mod icon;
 mod index_path;
 #[cfg(any(feature = "inspector", debug_assertions))]
 mod inspector;
-mod root;
+pub mod root;
 mod sizing;
 mod styled;
 mod time;
