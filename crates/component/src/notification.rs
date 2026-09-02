@@ -1011,6 +1011,7 @@ impl Render for NotificationList {
                     self.stacks.len() - 1
                 });
             let stack = &self.stacks[stack_ix].1;
+            let max_width = (size.width - margins.left - margins.right).min(width);
 
             items
                 .into_iter()
@@ -1021,20 +1022,44 @@ impl Render for NotificationList {
                 .placement(anchor)
                 .focus_handle(stack.focus_handle.clone())
                 .v_flex()
-                .w(width)
                 .max_h(size.height)
+                .w(width)
                 .absolute()
                 .map(|this| match anchor {
-                    Anchor::TopLeft => this.top(margins.top).left(margins.left),
-                    Anchor::TopRight => this.top(margins.top).right(margins.right),
-                    Anchor::TopCenter => this.top(margins.top).left_0().right_0().mx_auto(),
-                    Anchor::BottomLeft => this.bottom(margins.bottom).left(margins.left),
-                    Anchor::BottomRight => this.bottom(margins.bottom).right(margins.right),
-                    Anchor::BottomCenter => {
-                        this.bottom(margins.bottom).left_0().right_0().mx_auto()
+                    Anchor::TopLeft => this.top(margins.top).left(margins.left).w(max_width),
+                    Anchor::TopRight => this.top(margins.top).right(margins.right).w(max_width),
+                    Anchor::TopCenter => this
+                        .top(margins.top)
+                        .left_0()
+                        .right_0()
+                        .mx_auto()
+                        .w(max_width),
+                    Anchor::BottomLeft => {
+                        this.bottom(margins.bottom).left(margins.left).w(max_width)
                     }
-                    Anchor::LeftCenter => this.left(margins.left).top_0().bottom_0().my_auto(),
-                    Anchor::RightCenter => this.right(margins.right).top_0().bottom_0().my_auto(),
+                    Anchor::BottomRight => this
+                        .bottom(margins.bottom)
+                        .right(margins.right)
+                        .w(max_width),
+                    Anchor::BottomCenter => this
+                        .flex_col_reverse()
+                        .bottom(margins.bottom)
+                        .left_0()
+                        .right_0()
+                        .w(max_width)
+                        .mx_auto(),
+                    Anchor::LeftCenter => this
+                        .left(margins.left)
+                        .top_0()
+                        .bottom_0()
+                        .my_auto()
+                        .w(max_width),
+                    Anchor::RightCenter => this
+                        .right(margins.right)
+                        .top_0()
+                        .bottom_0()
+                        .my_auto()
+                        .w(max_width),
                 })
         });
 
