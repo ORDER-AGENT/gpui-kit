@@ -37,6 +37,7 @@ pub struct Badge {
     children: Vec<AnyElement>,
     color: Option<Hsla>,
     size: Size,
+    top_offset: Option<f32>,
 }
 
 impl Badge {
@@ -50,6 +51,7 @@ impl Badge {
             color: None,
             children: Vec::new(),
             size: Size::default(),
+            top_offset: None,
         }
     }
 
@@ -82,6 +84,15 @@ impl Badge {
     /// Set the color (background) of the badge.
     pub fn color(mut self, color: impl Into<Hsla>) -> Self {
         self.color = Some(color.into());
+        self
+    }
+
+    /// Offset the badge vertically from its default position.
+    ///
+    /// Useful for fine-tuning placement without moving the child element
+    /// (e.g. a clickable logo or icon underneath).
+    pub fn top_offset(mut self, offset: f32) -> Self {
+        self.top_offset = Some(offset);
         self
     }
 }
@@ -135,12 +146,15 @@ impl RenderOnce for Badge {
                                     self.count.to_string()
                                 };
 
+                                let top_offset = self.top_offset.unwrap_or(0.);
                                 let (top, left) = match self.size {
-                                    Size::Large => (px(2.), -px(count.len() as f32)),
+                                    Size::Large => (px(2. + top_offset), -px(count.len() as f32)),
                                     Size::Medium | Size::Size(_) => {
-                                        (-px(3.), -px(3.) * count.len())
+                                        (px(-3. + top_offset), -px(3.) * count.len())
                                     }
-                                    Size::Small | Size::XSmall => (-px(4.), -px(4.) * count.len()),
+                                    Size::Small | Size::XSmall => {
+                                        (px(-4. + top_offset), -px(4.) * count.len())
+                                    }
                                 };
 
                                 this.top(top)
