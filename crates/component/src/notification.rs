@@ -12,7 +12,7 @@ use gpui::{
     InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, SharedString,
     StatefulInteractiveElement, StyleRefinement, Styled, Subscription, SystemNotification,
     SystemNotificationResponse, WeakEntity, Window, WindowId, div, prelude::FluentBuilder, px,
-    relative, rems,
+    rems,
 };
 use gpui_base::{
     LogicalStyledExt as _, Toast as BaseToast, ToastManager, ToastMotion, ToastOptions, ToastStack,
@@ -558,6 +558,8 @@ pub struct NotificationSettings {
     ///
     /// A single notification can override this with [`Notification::delivery`].
     pub delivery: NotificationDelivery,
+    /// Duration in seconds before auto-hiding, default: 1.0
+    pub duration: f64,
 }
 
 impl Default for NotificationSettings {
@@ -574,6 +576,7 @@ impl Default for NotificationSettings {
             max_items: 10,
             width: DEFAULT_NOTIFICATION_WIDTH,
             delivery: NotificationDelivery::default(),
+            duration: 1.0,
         }
     }
 }
@@ -882,7 +885,9 @@ impl NotificationList {
             id,
             notification,
             ToastOptions {
-                timeout: autohide.then_some(Duration::from_secs(5)),
+                timeout: autohide.then_some(Duration::from_secs_f64(
+                    cx.theme().notification.duration.clamp(0.1, 60.0),
+                )),
             },
             cx.background_executor().now(),
         );
@@ -1054,6 +1059,7 @@ impl Render for NotificationList {
                     self.stacks.len() - 1
                 });
             let stack = &self.stacks[stack_ix].1;
+            let max_width = (size.width - margins.left - margins.right).min(width);
 
             items
                 .into_iter()
@@ -1068,17 +1074,40 @@ impl Render for NotificationList {
                 .max_h(size.height)
                 .absolute()
                 .map(|this| match anchor {
-                    Anchor::TopLeft => this.top(margins.top).left(margins.left),
-                    Anchor::TopRight => this.top(margins.top).right(margins.right),
-                    Anchor::TopCenter => this.top(margins.top).left(relative(0.5)).ml(-width / 2.),
-                    Anchor::BottomLeft => this.bottom(margins.bottom).left(margins.left),
-                    Anchor::BottomRight => this.bottom(margins.bottom).right(margins.right),
-                    Anchor::BottomCenter => this
+                    Anchor::TopLeft => this.top(margins.top).left(margins.left).w(max_width),
+                    Anchor::TopRight => this.top(margins.top).right(margins.right).w(max_width),
+                    Anchor::TopCenter => this
+                        .top(margins.top)
+                        .left_0()
+                        .right_0()
+                        .mx_auto()
+                        .w(max_width),
+                    Anchor::BottomLeft => {
+                        this.bottom(margins.bottom).left(margins.left).w(max_width)
+                    }
+                    Anchor::BottomRight => this
                         .bottom(margins.bottom)
-                        .left(relative(0.5))
-                        .ml(-width / 2.),
-                    Anchor::LeftCenter => this.left(margins.left).top_0().bottom_0().my_auto(),
-                    Anchor::RightCenter => this.right(margins.right).top_0().bottom_0().my_auto(),
+                        .right(margins.right)
+                        .w(max_width),
+                    Anchor::BottomCenter => this
+                        .flex_col_reverse()
+                        .bottom(margins.bottom)
+                        .left_0()
+                        .right_0()
+                        .w(max_width)
+                        .mx_auto(),
+                    Anchor::LeftCenter => this
+                        .left(margins.left)
+                        .top_0()
+                        .bottom_0()
+                        .my_auto()
+                        .w(max_width),
+                    Anchor::RightCenter => this
+                        .right(margins.right)
+                        .top_0()
+                        .bottom_0()
+                        .my_auto()
+                        .w(max_width),
                 })
         });
 
