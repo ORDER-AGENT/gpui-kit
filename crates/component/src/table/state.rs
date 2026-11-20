@@ -276,6 +276,9 @@ pub struct TableState<D: TableDelegate> {
     pub horizontal_scroll_handle: VirtualListScrollHandle,
 
     selected_row: Option<usize>,
+    selected_rows: std::collections::HashSet<usize>,
+    selection_anchor: Option<usize>,
+    multi_select: bool,
     selection_mode: SelectionMode,
     right_clicked_row: Option<usize>,
     right_clicked_cell: Option<(usize, usize)>,
@@ -321,6 +324,9 @@ where
             vertical_scroll_handle: UniformListScrollHandle::new(),
             selection_mode: SelectionMode::Row,
             selected_row: None,
+            selected_rows: std::collections::HashSet::new(),
+            selection_anchor: None,
+            multi_select: false,
             right_clicked_row: None,
             right_clicked_cell: None,
             selected_col: None,
@@ -539,6 +545,30 @@ where
     pub fn selected_row(&self) -> Option<usize> {
         self.selected_row.filter(|_| self.selection_mode.is_row())
     }
+    pub fn selected_rows(&self) -> std::collections::HashSet<usize> {
+        self.selected_rows.clone()
+    }
+    pub fn is_row_selected(&self, ix: usize) -> bool {
+        if self.multi_select {
+            self.selected_rows.contains(&ix)
+        } else {
+            self.selected_row == Some(ix)
+        }
+    }
+    pub fn set_multi_select(&mut self, v: bool) {
+        self.multi_select = v;
+    }
+    pub fn select_all_rows(&mut self, cx: &mut Context<Self>) {
+        let n = self.delegate.rows_count(cx);
+        self.selected_rows = (0..n).collect();
+        self.selected_row = self.selected_rows.iter().copied().min();
+        self.selection_anchor = self.selected_row;
+        cx.notify();
+    }
+
+    pub fn is_multi_select(&self) -> bool {
+        self.multi_select
+    }
 
     /// Sets the selected row to the given index.
     ///
@@ -556,6 +586,12 @@ where
 
         self.selection_mode = SelectionMode::Row;
         self.right_clicked_row = None;
+        if self.multi_select {
+            // Ctrl/Shift handling is done in click handler; direct calls keep single if not multi op
+            self.selected_rows.clear();
+            self.selected_rows.insert(row_ix);
+            self.selection_anchor = Some(row_ix);
+        }
         self.selected_row = Some(row_ix);
         if scroll {
             self.vertical_scroll_handle.scroll_to_item(
@@ -685,6 +721,8 @@ where
     pub fn clear_selection(&mut self, cx: &mut Context<Self>) {
         self.selection_mode = SelectionMode::Row;
         self.selected_row = None;
+        self.selected_rows.clear();
+        self.selection_anchor = None;
         self.selected_col = None;
         self.selected_cell = None;
         cx.emit(TableEvent::ClearSelection);
@@ -918,7 +956,35 @@ where
         }
 
         cx.stop_propagation();
-        if self.selects_row_on_click(e, cx) {
+        if self.multi_select {
+            let ctrl = e.modifiers().control || e.modifiers().platform;
+            let shift = e.modifiers().shift;
+            if shift {
+                let anchor = self.selection_anchor.unwrap_or(row_ix);
+                let (lo, hi) = if anchor <= row_ix {
+                    (anchor, row_ix)
+                } else {
+                    (row_ix, anchor)
+                };
+                self.selected_rows = (lo..=hi).collect();
+                self.selected_row = Some(row_ix);
+                cx.notify();
+                cx.emit(TableEvent::SelectRow(row_ix));
+            } else if ctrl {
+                if self.selected_rows.contains(&row_ix) {
+                    self.selected_rows.remove(&row_ix);
+                    self.selected_row = self.selected_rows.iter().copied().min();
+                } else {
+                    self.selected_rows.insert(row_ix);
+                    self.selected_row = Some(row_ix);
+                    self.selection_anchor = Some(row_ix);
+                }
+                cx.notify();
+                cx.emit(TableEvent::SelectRow(row_ix));
+            } else {
+                self.set_selected_row(row_ix, cx);
+            }
+        } else if self.selects_row_on_click(e, cx) {
             self.select_row(row_ix, true, cx);
         }
 
@@ -2362,7 +2428,7 @@ where
         let is_stripe_row = self.options.stripe && row_ix % 2 != 0;
         // `selected_row()` is `None` outside row mode, so a selected cell or
         // column never highlights its row.
-        let is_selected = self.selected_row() == Some(row_ix);
+        let is_selected = self.is_row_selected(row_ix);
         let view = cx.entity();
         let row_height = self.options.size.table_row_height();
 
