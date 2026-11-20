@@ -16,7 +16,20 @@ use gpui::{
     deferred, div, prelude::FluentBuilder as _,
 };
 use gpui_base::{TextSelection, TextSelectionScopeId, motion::Presence};
-use std::{any::TypeId, cell::Cell, rc::Rc};
+use std::{
+    any::TypeId,
+    cell::Cell,
+    rc::Rc,
+    sync::atomic::{AtomicBool, Ordering},
+};
+
+static INPUT_ACTIVE: AtomicBool = AtomicBool::new(false);
+pub fn input_active() -> bool {
+    INPUT_ACTIVE.load(Ordering::Relaxed)
+}
+pub(crate) fn set_input_active(v: bool) {
+    INPUT_ACTIVE.store(v, Ordering::Relaxed);
+}
 
 pub(crate) fn init(cx: &mut App) {
     gpui_base::Root::register_plugin::<WindowState>(cx, WindowState::new);
@@ -431,6 +444,7 @@ impl WindowState {
     /// transition ends. Without one, it is removed as before.
     fn close_dialog_internal(&mut self, window: &mut Window, cx: &mut App) -> Option<FocusHandle> {
         self.focused_input = None;
+        set_input_active(false);
 
         let ix = self
             .active_dialogs
@@ -509,6 +523,7 @@ impl WindowState {
 
     pub fn close_all_dialogs(&mut self, window: &mut Window, cx: &mut Context<'_, WindowState>) {
         self.focused_input = None;
+        set_input_active(false);
         let previous_focused_handle = self
             .active_dialogs
             .first()
@@ -561,6 +576,7 @@ impl WindowState {
 
     pub fn close_sheet(&mut self, window: &mut Window, cx: &mut Context<'_, WindowState>) {
         self.focused_input = None;
+        set_input_active(false);
         if let Some(previous_handle) = self
             .active_sheet
             .as_ref()

@@ -386,8 +386,10 @@ pub(super) fn sync_focused_input_registry(
     WindowState::try_update(window, cx, |root, _, cx| {
         if focused {
             root.focused_input = Some(state.clone());
+            crate::root::set_input_active(true);
         } else if root.focused_input.as_ref() == Some(&state) {
             root.focused_input = None;
+            crate::root::set_input_active(false);
         }
         cx.notify();
     });
